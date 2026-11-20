@@ -212,13 +212,15 @@ void FGenProcessor::triggerVoice (int slot, const SampleData& sd, const Event& e
     if (! e.isPreview) st = patterns[(size_t) slot].get (e.step);
 
     double semis = param ("pitch") + param ("fine") / 100.0;
+    // melody notes (scale degrees) always apply; KEY TUNE only decides whether the sample's root is moved to the key
+    const int scale = (int) apvts.getRawParameterValue ("scale")->load();
+    semis += degreeToSemitones (st.degree, scale);
     if (param ("tune") > 0.5f)
     {
         const int key = (int) apvts.getRawParameterValue ("key")->load();
-        const int scale = (int) apvts.getRawParameterValue ("scale")->load();
         int t = ((key - getEffectiveRootFast (slot, sd)) % 12 + 12) % 12;
         if (t > 6) t -= 12;
-        semis += t + degreeToSemitones (st.degree, scale);
+        semis += t;
     }
     if ((int) apvts.getRawParameterValue ("mode")->load() == 1)
         semis += lastNote - 60;

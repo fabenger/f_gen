@@ -168,7 +168,7 @@ public:
 
         // chord / bar movement
         std::array<int, kMaxBars> barShift {};
-        if (! g.percussive && g.melody > 0.35f && rng.nextFloat() < g.melody)
+        if (g.melody > 0.35f && rng.nextFloat() < g.melody)
         {
             static const int progs[][4] = { { 0, 0, 0, 0 }, { 0, 0, -2, -2 }, { 0, 3, 0, 4 }, { 0, -1, -2, -3 },
                                             { 0, 0, 3, 3 }, { 0, 5, 3, 4 }, { 0, 2, 0, -2 } };
@@ -223,7 +223,7 @@ public:
                     s.on = true;
                     s.vel = 70 + rng.nextInt (50);
                     if (g.percussive && rng.nextFloat() < 0.3f) s.ratchet = 2 + rng.nextInt (2);
-                    if (! g.percussive && g.melody > 0.0f && rng.nextFloat() < g.melody)
+                    if (g.melody > 0.0f && rng.nextFloat() < g.melody)
                         s.degree = juce::jlimit (-8, 7, s.degree + rng.nextInt (5) - 1);
                 }
             }
@@ -394,7 +394,7 @@ private:
 
     static void applyMelody (std::vector<Step>& v, const GenSettings& g, juce::Random& rng)
     {
-        if (g.percussive || g.melody <= 0.0f) return;
+        if (g.melody <= 0.0f) return;
         static const int degrees[] = { 0, 0, 4, 2, -3, 3, 5, 7, -2, 1 };
         for (auto& s : v)
             if (s.on && rng.nextFloat() < g.melody * 0.6f)
