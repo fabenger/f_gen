@@ -14,7 +14,7 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override;
     juce::Slider slider;
-    juce::Colour labelColour { fgen::Colours::cream };
+    juce::Colour labelColour { fgen::Colours::ink };
 private:
     juce::String text;
 };
@@ -103,7 +103,7 @@ private:
     void drawPanel (juce::Graphics&, juce::Rectangle<int>, const juce::String& title);
 
     FGenProcessor& proc;
-    fgen::RetroLookAndFeel lnf;
+    fgen::FGenLookAndFeel lnf;
     int selectedSlot = 0;
 
     // global
@@ -134,7 +134,8 @@ private:
     Knob attack { "ATTACK" }, decay { "DECAY" }, sustain { "SUSTAIN" }, release { "RELEASE" }, gate { "GATE" };
     Knob cutoff { "CUTOFF" }, reso { "RESO" }, drive { "DRIVE" }, crush { "CRUSH" };
     Knob vol { "VOLUME" }, pan { "PAN" };
-    juce::ComboBox ftypeBox;
+    juce::ComboBox ftypeBox, outBox;
+    juce::Image avatar;
 
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> slotSliderAtts;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>> slotButtonAtts;

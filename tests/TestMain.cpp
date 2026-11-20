@@ -83,23 +83,28 @@ int main (int argc, char** argv)
     proc.loadSample (2, files[3]);
     proc.loadSample (3, files[4]);
     const double sr = 44100.0; const int bs = 512;
-    proc.setPlayConfigDetails (0, 2, sr, bs);
+    proc.setRateAndBufferSizeDetails (sr, bs);
+    proc.apvts.getParameter ("s1_out")->setValueNotifyingHost (1.0f); // slot B -> own out
     proc.prepareToPlay (sr, bs);
     FakePlayHead ph; proc.setPlayHead (&ph);
     const int total = (int) (sr * 60.0 / ph.bpm * 16.0);
-    juce::AudioBuffer<float> out (2, total), block (2, bs);
+    const int nch = proc.getTotalNumOutputChannels();
+    juce::AudioBuffer<float> out (2, total), block (nch, bs);
+    float auxPeak = 0.0f, mainPeakB = 0.0f;
     juce::MidiBuffer midi;
     float peak = 0.0f;
     for (int pos = 0; pos < total; pos += bs)
     {
         const int n = juce::jmin (bs, total - pos);
-        juce::AudioBuffer<float> blk (block.getArrayOfWritePointers(), 2, n);
+        juce::AudioBuffer<float> blk (block.getArrayOfWritePointers(), nch, n);
         proc.processBlock (blk, midi);
         for (int ch = 0; ch < 2; ++ch) out.copyFrom (ch, pos, blk, ch, 0, n);
+        if (nch >= 6) auxPeak = juce::jmax (auxPeak, blk.getMagnitude (4, 0, n));
         ph.ppq += n / (sr * 60.0 / ph.bpm);
     }
     peak = out.getMagnitude (0, total);
-    std::cout << "render peak " << peak << "\n";
+    std::cout << "render peak " << peak << "  channels " << nch << "  slot B own-out peak " << auxPeak << "\n";
+    if (nch != 10 || auxPeak < 0.001f) ++fails;
     if (peak < 0.01f || ! std::isfinite (peak)) ++fails;
     {
         auto f = dir.getChildFile ("render.wav"); f.deleteFile();

@@ -36,6 +36,9 @@ juce_add_plugin(f_gen
 
 juce_generate_juce_header(f_gen)
 
+juce_add_binary_data(f_gen_assets SOURCES Resources/avatar.png)
+set_target_properties(f_gen_assets PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
 target_sources(f_gen PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp)
@@ -49,6 +52,7 @@ target_compile_definitions(f_gen PUBLIC
 
 target_link_libraries(f_gen
     PRIVATE
+        f_gen_assets
         juce::juce_audio_utils
         juce::juce_audio_formats
         juce::juce_dsp
@@ -63,5 +67,5 @@ if(FGEN_BUILD_TESTS)
     # reuse the plugin's compiled JUCE code: same include paths and defines, link the shared-code lib
     target_include_directories(fgen_tests PRIVATE Source $<TARGET_PROPERTY:f_gen,INCLUDE_DIRECTORIES>)
     target_compile_definitions(fgen_tests PRIVATE $<TARGET_PROPERTY:f_gen,COMPILE_DEFINITIONS>)
-    target_link_libraries(fgen_tests PRIVATE f_gen)
+    target_link_libraries(fgen_tests PRIVATE f_gen f_gen_assets)
 endif()

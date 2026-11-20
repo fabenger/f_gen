@@ -17,7 +17,12 @@ float dbToGain (float db) { return db <= -59.0f ? 0.0f : juce::Decibels::decibel
 
 //==============================================================================
 FGenProcessor::FGenProcessor()
-    : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+    : AudioProcessor (BusesProperties()
+                          .withOutput ("Main", juce::AudioChannelSet::stereo(), true)
+                          .withOutput ("Slot A", juce::AudioChannelSet::stereo(), true)
+                          .withOutput ("Slot B", juce::AudioChannelSet::stereo(), true)
+                          .withOutput ("Slot C", juce::AudioChannelSet::stereo(), true)
+                          .withOutput ("Slot D", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMS", createLayout())
 {
     formatManager.registerBasicFormats();
@@ -95,6 +100,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout FGenProcessor::createLayout(
         layout.add (std::make_unique<AudioParameterFloat> (id ("variation"), p + "Variation", NormalisableRange<float> (0.0f, 1.0f, 0.001f), 0.4f, pct));
         layout.add (std::make_unique<AudioParameterFloat> (id ("melody"), p + "Melody", NormalisableRange<float> (0.0f, 1.0f, 0.001f), 0.0f, pct));
 
+        layout.add (std::make_unique<AudioParameterChoice>(id ("out"), p + "Output", StringArray { "Main", "Own Out" }, 0));
         layout.add (std::make_unique<AudioParameterBool>  (id ("mute"), p + "Mute", false));
         layout.add (std::make_unique<AudioParameterBool>  (id ("lock"), p + "Lock", false));
     }
@@ -105,7 +111,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout FGenProcessor::createLayout(
 bool FGenProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto& out = layouts.getMainOutputChannelSet();
-    return out == juce::AudioChannelSet::stereo() || out == juce::AudioChannelSet::mono();
+    if (out != juce::AudioChannelSet::stereo() && out != juce::AudioChannelSet::mono()) return false;
+    for (int i = 1; i < layouts.outputBuses.size(); ++i)
+    {
+        const auto& aux = layouts.outputBuses.getReference (i);
+        if (! aux.isDisabled() && aux != juce::AudioChannelSet::stereo()) return false;
+    }
+    return true;
 }
 
 void FGenProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -366,8 +378,7 @@ void FGenProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
         for (int s = 0; s < kNumSlots; ++s) local[(size_t) s] = samples[(size_t) s];
     }
 
-    auto* outL = buffer.getWritePointer (0);
-    auto* outR = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : nullptr;
+    auto mainBus = getBusBuffer (buffer, false, 0);
     const float master = dbToGain (apvts.getRawParameterValue ("master")->load());
 
     for (int s = 0; s < kNumSlots; ++s)
@@ -459,6 +470,19 @@ void FGenProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
         const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
         d.gainL.setTargetValue (vol * std::cos (angle) * juce::MathConstants<float>::sqrt2);
         d.gainR.setTargetValue (vol * std::sin (angle) * juce::MathConstants<float>::sqrt2);
+
+        // route: own output bus if selected and available, otherwise main
+        float* outL = mainBus.getWritePointer (0);
+        float* outR = mainBus.getNumChannels() > 1 ? mainBus.getWritePointer (1) : nullptr;
+        if ((int) param ("out") == 1 && s + 1 < getBusCount (false))
+        {
+            if (auto* bus = getBus (false, s + 1); bus != nullptr && bus->isEnabled() && bus->getNumberOfChannels() >= 2)
+            {
+                auto aux = getBusBuffer (buffer, false, s + 1);
+                outL = aux.getWritePointer (0);
+                outR = aux.getWritePointer (1);
+            }
+        }
 
         for (int i = 0; i < numSamples; ++i)
         {

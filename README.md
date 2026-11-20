@@ -14,9 +14,12 @@ Lädt One-Shots (Chord Stabs, Percussion, Noten) in 4 Slots und würfelt daraus 
 | **Slots A–D** | Sample per Drag & Drop oder Doppelklick laden. MUTE, LOCK (von „Randomize All“ ausnehmen), RND (neuer Rhythmus nur für diesen Slot). |
 | **Header** | KEY + SCALE (Tonart des Loops), LOOP (2/4/8 Takte), PLAY (Host Sync oder MIDI Trigger), SWING, MASTER, RANDOMIZE ALL. |
 | **Sample** | Wellenform, LOAD / PREVIEW / EJECT, KEY TUNE (Sample wird vom erkannten Grundton auf die Tonart gestimmt, bei Drums aus), REVERSE, ROOT (Auto oder manuell). |
+| **Output** | MAIN oder OWN OUT pro Slot (eigener Mixerkanal). |
 | **Pattern** | Klick = Step an/aus, ziehen = malen, Mausrad = Velocity, Rechtsklick = Note (Skalenstufe), Velocity, Ratchet. |
 | **Generator** | Stil: House, Deep/UG, Minimal Detroit (polymetrische Zyklen), Dub Chords, Euclid, Wild. DENSITY, VARIATION (Abwandlungen + Fills am Phrasenende), MELODY (Töne aus der Skala, Akkordwechsel). RANDOMIZE / UNDO / CLEAR. |
 | **Sound** | Pitch, Fine, Start · Attack, Decay, Sustain, Release, Gate (Notenlänge in Steps) · Filter (LP/HP/BP) Cutoff + Reso, Drive (Sättigung), Crush (Bit/Sample-Rate-Reduktion) · Volume, Pan. |
+
+**Einzelausgänge (FL-Mixer):** Im Sound-Bereich unter OUTPUT einen Slot auf „OWN OUT“ stellen. Slot A–D gehen dann auf Ausgang 2–5 (Hauptausgang = 1). In FL Studio im Plugin-Fenster oben links auf das Zahnrad (Wrapper-Einstellungen) → Tab **Processing** → bei den Output-Ports jedem Ausgang einen Mixer-Track zuweisen.
 
 **MIDI Trigger:** Pattern läuft nur, solange eine Taste gehalten wird; C5 (MIDI 60) = Originaltonhöhe, andere Tasten transponieren.
 

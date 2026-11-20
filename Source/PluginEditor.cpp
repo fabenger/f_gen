@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "BinaryData.h"
 
 using namespace fgen;
 namespace C = fgen::Colours;
@@ -23,7 +24,7 @@ void Knob::resized()
 void Knob::paint (juce::Graphics& g)
 {
     g.setColour (labelColour);
-    g.setFont (monoFont (10.0f, true));
+    g.setFont (uiFont (10.0f, true));
     g.drawText (text, getLocalBounds().removeFromBottom (14), juce::Justification::centred);
 }
 
@@ -34,7 +35,7 @@ SlotStrip::SlotStrip (FGenEditor& e, FGenProcessor& p, int index) : editor (e), 
     addAndMakeVisible (lock);
     addAndMakeVisible (rand);
     mute.setColour (juce::ToggleButton::tickColourId, C::red);
-    lock.setColour (juce::ToggleButton::tickColourId, C::teal);
+    lock.setColour (juce::ToggleButton::tickColourId, C::orange);
     muteAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, FGenProcessor::slotParam (slot, "mute"), mute);
     lockAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, FGenProcessor::slotParam (slot, "lock"), lock);
     lock.setTooltip ("Locked slots are skipped by RANDOMIZE ALL");
@@ -54,48 +55,57 @@ void SlotStrip::resized()
 void SlotStrip::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat().reduced (1.0f);
-    g.setColour (selected ? C::panelHi : C::panel);
+    g.setColour (juce::Colour (0x22000000));
+    g.fillRoundedRectangle (r.translated (0.0f, 1.5f), 5.0f);
+    g.setColour (C::panel);
     g.fillRoundedRectangle (r, 5.0f);
-    g.setColour (dragOver ? C::lcd : (selected ? C::orange : juce::Colour (0xff15130f)));
+    g.setColour (dragOver ? C::orange : (selected ? C::ink : C::panelEdge));
     g.drawRoundedRectangle (r, 5.0f, selected || dragOver ? 2.0f : 1.0f);
 
     auto inner = getLocalBounds().reduced (10, 8);
-    auto top = inner.removeFromTop (34);
+    auto top = inner.removeFromTop (30);
 
-    // big slot letter
-    auto letterBox = top.removeFromLeft (34).toFloat();
-    g.setColour (selected ? C::orange : C::cream.withAlpha (0.8f));
+    // slot letter key
+    auto letterBox = top.removeFromLeft (30).toFloat();
+    g.setColour (selected ? C::orange : C::ink);
     g.fillRoundedRectangle (letterBox, 4.0f);
-    g.setColour (C::bg);
-    g.setFont (monoFont (22.0f, true));
+    g.setColour (juce::Colours::white);
+    g.setFont (uiFont (18.0f, true));
     g.drawText (juce::String::charToString ((juce::juce_wchar) ('A' + slot)), letterBox, juce::Justification::centred);
 
-    // activity LED
-    auto ledR = juce::Rectangle<float> (10.0f, 10.0f).withCentre ({ (float) top.getRight() - 6.0f, (float) top.getY() + 8.0f });
-    if (led > 0.02f)
-    {
-        g.setColour (C::orange.withAlpha (0.4f * led));
-        g.fillEllipse (ledR.expanded (4.0f));
-    }
-    g.setColour (C::orange.withAlpha (0.25f + 0.75f * led));
-    g.fillEllipse (ledR);
-
-    // LCD with sample info
-    auto lcd = inner.removeFromTop (inner.getHeight() - 26).reduced (0, 4);
-    g.setColour (C::lcdBg);
-    g.fillRoundedRectangle (lcd.toFloat(), 3.0f);
     auto sd = proc.getSample (slot);
     auto styleIdx = (int) proc.apvts.getRawParameterValue (FGenProcessor::slotParam (slot, "style"))->load();
-    g.setFont (monoFont (12.0f, true));
-    g.setColour (C::lcd);
-    auto t = lcd.reduced (6, 3);
-    g.drawText (sd != nullptr ? sd->name : juce::String ("-- drop sample --"), t.removeFromTop (16), juce::Justification::centredLeft, true);
-    g.setFont (monoFont (11.0f));
-    g.setColour (C::lcd.withAlpha (0.7f));
-    juce::String info = sd != nullptr ? ("ROOT " + sd->root.description) : juce::String ("wav/aif/flac/mp3");
-    g.drawText (info, t.removeFromTop (14), juce::Justification::centredLeft, true);
-    g.drawText (styleNames()[styleIdx], t.removeFromTop (14), juce::Justification::centredLeft, true);
+    const bool ownOut = proc.apvts.getRawParameterValue (FGenProcessor::slotParam (slot, "out"))->load() > 0.5f;
 
+    // name next to the letter
+    g.setColour (C::ink);
+    g.setFont (uiFont (13.0f, true));
+    auto nameArea = top.withTrimmedLeft (8).withTrimmedRight (18);
+    g.drawText (sd != nullptr ? sd->name : juce::String ("empty"), nameArea, juce::Justification::centredLeft, true);
+
+    // activity LED
+    auto ledR = juce::Rectangle<float> (9.0f, 9.0f).withCentre ({ (float) top.getRight() - 5.0f, (float) top.getCentreY() });
+    if (led > 0.02f)
+    {
+        g.setColour (C::red.withAlpha (0.35f * led));
+        g.fillEllipse (ledR.expanded (4.0f));
+    }
+    g.setColour (led > 0.02f ? C::red.withAlpha (0.4f + 0.6f * led) : juce::Colour (0xffc9c5bb));
+    g.fillEllipse (ledR);
+
+    // info block
+    auto info = inner.removeFromTop (inner.getHeight() - 26).reduced (0, 6);
+    g.setColour (C::display);
+    g.fillRoundedRectangle (info.toFloat(), 3.0f);
+    auto t = info.reduced (8, 4);
+    g.setFont (uiFont (11.5f, true));
+    g.setColour (C::displayInk);
+    g.drawText (sd != nullptr ? ("ROOT  " + sd->root.description) : juce::String ("drop a one-shot here"), t.removeFromTop (16),
+                juce::Justification::centredLeft, true);
+    g.setFont (uiFont (11.0f));
+    g.setColour (C::inkDim);
+    g.drawText (juce::String (styleNames()[styleIdx]).toUpperCase(), t.removeFromTop (15), juce::Justification::centredLeft, true);
+    g.drawText (ownOut ? "OUT " + juce::String (slot + 2) : juce::String ("OUT MAIN"), t.removeFromTop (15), juce::Justification::centredLeft, true);
 }
 
 void SlotStrip::mouseDown (const juce::MouseEvent& e)
@@ -139,19 +149,20 @@ void WaveDisplay::rebuild()
 void WaveDisplay::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
-    g.setColour (C::lcdBg);
+    g.setColour (C::display);
     g.fillRoundedRectangle (r, 4.0f);
-
-    // scanlines for a CRT-ish feel
-    g.setColour (juce::Colour (0x0affb347));
-    for (int y = 0; y < getHeight(); y += 3) g.drawHorizontalLine (y, 2.0f, r.getRight() - 2.0f);
+    g.setColour (juce::Colour (0x22000000));
+    g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
 
     auto sd = proc.getSample (slot);
-    auto inner = r.reduced (6.0f, 18.0f);
+    auto inner = r.reduced (8.0f, 20.0f);
+    g.setColour (C::displayDim.withAlpha (0.6f));
+    g.drawHorizontalLine ((int) inner.getCentreY(), inner.getX(), inner.getRight());
+
     if (sd == nullptr || peaks.empty())
     {
-        g.setColour (C::lcdDim);
-        g.setFont (monoFont (14.0f, true));
+        g.setColour (C::inkDim);
+        g.setFont (uiFont (14.0f, true));
         g.drawText ("DROP A ONE-SHOT HERE  /  CLICK LOAD", r, juce::Justification::centred);
         return;
     }
@@ -159,30 +170,32 @@ void WaveDisplay::paint (juce::Graphics& g)
     const float start = proc.apvts.getRawParameterValue (FGenProcessor::slotParam (slot, "start"))->load();
     const bool rev = proc.apvts.getRawParameterValue (FGenProcessor::slotParam (slot, "reverse"))->load() > 0.5f;
     const float cy = inner.getCentreY(), hh = inner.getHeight() * 0.5f;
-    for (size_t x = 0; x < peaks.size(); ++x)
+    for (size_t x = 0; x < peaks.size() && (float) x < inner.getWidth(); ++x)
     {
         const size_t idx = rev ? peaks.size() - 1 - x : x;
         const float prop = (float) idx / (float) peaks.size();
-        g.setColour (prop < start ? C::lcdDim : C::lcd);
+        g.setColour (prop < start ? C::displayDim : C::displayInk);
         const float h = juce::jmax (0.5f, peaks[idx] * hh);
         g.drawVerticalLine ((int) (inner.getX() + (float) x), cy - h, cy + h);
     }
 
-    // start marker
     const float sx = inner.getX() + (rev ? 1.0f - start : start) * inner.getWidth();
     g.setColour (C::orange);
-    g.drawVerticalLine ((int) sx, inner.getY() - 8.0f, inner.getBottom() + 8.0f);
+    g.fillRect (juce::Rectangle<float> (sx - 1.0f, inner.getY() - 10.0f, 2.0f, inner.getHeight() + 20.0f));
 
-    g.setFont (monoFont (11.0f, true));
-    g.setColour (C::lcd);
+    auto txt = r.reduced (10.0f, 4.0f);
+    g.setFont (uiFont (11.5f, true));
+    g.setColour (C::ink);
     const double secs = sd->buffer.getNumSamples() / sd->sampleRate;
-    g.drawText (sd->name, r.reduced (8.0f, 3.0f).removeFromTop (14.0f), juce::Justification::centredLeft, true);
-    g.drawText (juce::String (secs, 2) + " s  " + juce::String ((int) sd->sampleRate) + " Hz", r.reduced (8.0f, 3.0f).removeFromTop (14.0f),
+    g.drawText (sd->name, txt.removeFromTop (14.0f), juce::Justification::centredLeft, true);
+    g.setColour (C::inkDim);
+    g.drawText (juce::String (secs, 2) + " s   " + juce::String ((int) sd->sampleRate) + " Hz", r.reduced (10.0f, 4.0f).removeFromTop (14.0f),
                 juce::Justification::centredRight);
     const int effRoot = proc.getEffectiveRoot (slot);
     const bool autoRoot = proc.apvts.getRawParameterValue (FGenProcessor::slotParam (slot, "root"))->load() < 0.5f;
-    g.drawText ("DETECTED: " + sd->root.description + (autoRoot ? "" : "   ROOT SET: " + noteNames()[effRoot]),
-                r.reduced (8.0f, 3.0f).removeFromBottom (14.0f), juce::Justification::centredLeft);
+    g.setColour (C::ink);
+    g.drawText ("DETECTED  " + sd->root.description + (autoRoot ? "" : "     ROOT SET  " + noteNames()[effRoot]),
+                r.reduced (10.0f, 4.0f).removeFromBottom (14.0f), juce::Justification::centredLeft);
 }
 
 void WaveDisplay::filesDropped (const juce::StringArray& files, int, int)
@@ -219,8 +232,8 @@ void StepGrid::paint (juce::Graphics& g)
 
     for (int b = 0; b < bars; ++b)
     {
-        g.setColour (C::creamDim);
-        g.setFont (monoFont (11.0f, true));
+        g.setColour (C::inkDim);
+        g.setFont (uiFont (11.0f, true));
         g.drawText (juce::String (b + 1), juce::Rectangle<float> (0.0f, b * h, 24.0f, h - 3.0f), juce::Justification::centred);
     }
 
@@ -229,38 +242,44 @@ void StepGrid::paint (juce::Graphics& g)
         auto r = cellBounds (i);
         const auto st = proc.getStep (slot, i);
         const bool beat = (i % 4) == 0;
-        g.setColour (beat ? juce::Colour (0xff3d362f) : juce::Colour (0xff302a24));
-        g.fillRoundedRectangle (r, 2.5f);
+
+        // key cap
+        g.setColour (juce::Colour (0x30000000));
+        g.fillRoundedRectangle (r.translated (0.0f, 1.5f), 3.0f);
+        auto capCol = st.on ? C::orange.interpolatedWith (juce::Colour (0xfff7c9a6), 1.0f - st.vel / 127.0f)
+                            : (beat ? juce::Colour (0xffd3d0c7) : C::cap);
+        g.setColour (capCol);
+        g.fillRoundedRectangle (r, 3.0f);
+        g.setColour (capCol.darker (0.18f));
+        g.drawRoundedRectangle (r, 3.0f, 1.0f);
+
+        // little LED at the top of each key
+        auto ledR = juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ r.getCentreX(), r.getY() + 6.0f });
+        const bool isPlay = (i == play);
+        g.setColour (isPlay ? C::red : (st.on ? juce::Colour (0x55ffffff) : juce::Colour (0x22000000)));
+        g.fillEllipse (ledR);
 
         if (st.on)
         {
-            const float v = st.vel / 127.0f;
-            auto fill = r.reduced (2.0f);
-            g.setColour (C::orange.withAlpha (0.25f));
-            g.fillRoundedRectangle (fill, 2.0f);
-            auto bar = fill.withTrimmedTop (fill.getHeight() * (1.0f - v));
-            g.setColour (C::orange.interpolatedWith (C::lcd, 1.0f - v));
-            g.fillRoundedRectangle (bar, 2.0f);
-
             if (st.ratchet > 1)
             {
-                g.setColour (C::bg);
+                g.setColour (juce::Colours::white);
                 for (int k = 0; k < st.ratchet; ++k)
-                    g.fillEllipse (fill.getX() + 3.0f + k * 5.0f, fill.getY() + 3.0f, 3.0f, 3.0f);
+                    g.fillEllipse (r.getX() + 4.0f + k * 5.0f, r.getBottom() - 8.0f, 3.0f, 3.0f);
             }
             if (st.degree != 0)
             {
-                g.setColour (C::bg);
-                g.setFont (monoFont (10.0f, true));
-                g.drawText ((st.degree > 0 ? "+" : "") + juce::String (st.degree), fill.withTrimmedTop (fill.getHeight() * 0.4f),
+                g.setColour (juce::Colours::white);
+                g.setFont (uiFont (10.5f, true));
+                g.drawText ((st.degree > 0 ? "+" : "") + juce::String (st.degree), r.withTrimmedTop (r.getHeight() * 0.35f),
                             juce::Justification::centred);
             }
         }
 
-        if (i == play)
+        if (isPlay)
         {
-            g.setColour (C::cream.withAlpha (0.85f));
-            g.drawRoundedRectangle (r, 2.5f, 1.5f);
+            g.setColour (C::ink);
+            g.drawRoundedRectangle (r.expanded (1.0f), 3.5f, 1.5f);
         }
     }
 }
@@ -357,11 +376,11 @@ FGenEditor::FGenEditor (FGenProcessor& p)
     modeBox.setTooltip ("HOST SYNC: plays with the FL Studio transport.  MIDI TRIGGER: plays while a key is held, key transposes (C5 = original).");
     addAndMakeVisible (swing);
     addAndMakeVisible (master);
-    swing.labelColour = master.labelColour = C::bg;
     swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.apvts, "swing", swing.slider);
     masterAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.apvts, "master", master.slider);
     addAndMakeVisible (randAll);
     randAll.setColour (juce::TextButton::buttonColourId, C::orange);
+    randAll.setColour (juce::TextButton::textColourOffId, juce::Colours::white);
     randAll.onClick = [this] { proc.randomizeAll(); grid.repaint(); };
     barsBox.onChange = [this] { grid.repaint(); };
 
@@ -395,6 +414,7 @@ FGenEditor::FGenEditor (FGenProcessor& p)
     melody.slider.setTooltip ("Adds notes from the selected scale (for chord stabs / melodic one-shots)");
     for (auto* b : { &randBtn, &undoBtn, &clearPatBtn }) addAndMakeVisible (b);
     randBtn.setColour (juce::TextButton::buttonColourId, C::orange);
+    randBtn.setColour (juce::TextButton::textColourOffId, juce::Colours::white);
     randBtn.onClick = [this] { proc.randomizeSlot (selectedSlot); grid.repaint(); };
     undoBtn.onClick = [this] { proc.undo (selectedSlot); grid.repaint(); };
     clearPatBtn.onClick = [this] { proc.clearSlot (selectedSlot); grid.repaint(); };
@@ -405,10 +425,15 @@ FGenEditor::FGenEditor (FGenProcessor& p)
         addAndMakeVisible (k);
     ftypeBox.addItemList ({ "LP", "HP", "BP" }, 1);
     addAndMakeVisible (ftypeBox);
+    outBox.addItemList ({ "MAIN", "OWN OUT" }, 1);
+    outBox.setTooltip ("OWN OUT sends this slot to its own plugin output (Out 2-5) so you can route it to a separate FL mixer track");
+    addAndMakeVisible (outBox);
+    outBox.onChange = [this] { for (auto& st : strips) st->repaint(); };
+    avatar = juce::ImageCache::getFromMemory (BinaryData::avatar_png, BinaryData::avatar_pngSize);
     start.slider.onValueChange = [this] { wave.repaint(); };
 
     for (auto& v : seenVersion) v = -1;
-    setSize (1100, 744);
+    setSize (1160, 744);
     selectSlot (0);
     startTimerHz (30);
 }
@@ -445,6 +470,7 @@ void FGenEditor::attachSlotControls()
     slotComboAtts.push_back (std::make_unique<CA> (proc.apvts, FGenProcessor::slotParam (s, "root"), rootBox));
     slotComboAtts.push_back (std::make_unique<CA> (proc.apvts, FGenProcessor::slotParam (s, "style"), styleBox));
     slotComboAtts.push_back (std::make_unique<CA> (proc.apvts, FGenProcessor::slotParam (s, "ftype"), ftypeBox));
+    slotComboAtts.push_back (std::make_unique<CA> (proc.apvts, FGenProcessor::slotParam (s, "out"), outBox));
 }
 
 void FGenEditor::selectSlot (int s)
@@ -512,24 +538,19 @@ void FGenEditor::timerCallback()
 void FGenEditor::drawPanel (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& title)
 {
     auto rf = r.toFloat();
+    g.setColour (juce::Colour (0x22000000));
+    g.fillRoundedRectangle (rf.translated (0.0f, 1.5f), 6.0f);
     g.setColour (C::panel);
     g.fillRoundedRectangle (rf, 6.0f);
-    g.setColour (juce::Colour (0xff15130f));
-    g.drawRoundedRectangle (rf, 6.0f, 1.0f);
-
-    // screws
-    g.setColour (juce::Colour (0xff4a4238));
-    for (auto pt : { rf.getTopLeft() + juce::Point<float> (7, 7), rf.getTopRight() + juce::Point<float> (-7, 7),
-                     rf.getBottomLeft() + juce::Point<float> (7, -7), rf.getBottomRight() + juce::Point<float> (-7, -7) })
-    {
-        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (pt));
-    }
+    g.setColour (C::panelEdge);
+    g.drawRoundedRectangle (rf.reduced (0.5f), 6.0f, 1.0f);
 
     if (title.isNotEmpty())
     {
-        g.setColour (C::creamDim);
-        g.setFont (monoFont (11.0f, true));
-        g.drawText (title, r.reduced (16, 4).removeFromTop (14), juce::Justification::centredLeft);
+        auto tr = r.reduced (16, 6).removeFromTop (14);
+        g.setColour (C::ink);
+        g.setFont (uiFont (11.5f, true));
+        g.drawText (title, tr, juce::Justification::centredLeft);
     }
 }
 
@@ -537,49 +558,65 @@ void FGenEditor::paint (juce::Graphics& g)
 {
     g.fillAll (C::bg);
 
-    // header strip: cream panel like old hardware
+    // header: white body with a thin orange line
     auto h = headerArea.toFloat();
-    g.setColour (C::cream);
+    g.setColour (juce::Colour (0x22000000));
+    g.fillRoundedRectangle (h.translated (0.0f, 1.5f), 6.0f);
+    g.setColour (juce::Colours::white);
     g.fillRoundedRectangle (h, 6.0f);
-    // stripes
-    const juce::Colour stripes[] = { C::orange, C::red, juce::Colour (0xffe8b04a), C::teal };
-    for (int i = 0; i < 4; ++i)
-    {
-        g.setColour (stripes[i]);
-        g.fillRect (juce::Rectangle<float> (h.getX() + 190.0f + i * 9.0f, h.getY(), 6.0f, h.getHeight()));
-    }
-    g.setColour (C::bg);
-    g.setFont (juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 38.0f, juce::Font::bold | juce::Font::italic)));
-    g.drawText ("f_gen", juce::Rectangle<float> (h.getX() + 18.0f, h.getY(), 170.0f, h.getHeight() - 8.0f), juce::Justification::centredLeft);
-    g.setFont (monoFont (10.0f, true));
-    g.drawText ("RHYTHM SAMPLER", juce::Rectangle<float> (h.getX() + 20.0f, h.getBottom() - 20.0f, 170.0f, 14.0f), juce::Justification::centredLeft);
+    g.setColour (C::panelEdge);
+    g.drawRoundedRectangle (h.reduced (0.5f), 6.0f, 1.0f);
 
-    // labels for global combos
-    g.setFont (monoFont (10.0f, true));
-    g.setColour (C::bg.withAlpha (0.75f));
+    // avatar + logo
+    auto logo = h.reduced (14.0f, 6.0f).removeFromLeft (230.0f);
+    auto av = logo.removeFromLeft (46.0f).withSizeKeepingCentre (46.0f, 46.0f).translated (0.0f, -2.0f);
+    if (avatar.isValid())
+    {
+        g.drawImage (avatar, av, juce::RectanglePlacement::centred);
+        g.setColour (C::ink);
+        g.drawEllipse (av.reduced (0.5f), 1.2f);
+    }
+    logo.removeFromLeft (10.0f);
+    g.setColour (C::ink);
+    auto textBlock = logo.withSizeKeepingCentre (logo.getWidth(), 48.0f);
+    g.setFont (uiFont (32.0f, true));
+    g.drawText ("f_gen", textBlock.removeFromTop (32.0f), juce::Justification::centredLeft);
+    g.setColour (C::orange);
+    g.fillRect (juce::Rectangle<float> (textBlock.getX() + 1.0f, textBlock.getY() + 1.0f, 18.0f, 2.0f));
+    g.setColour (C::inkDim);
+    g.setFont (uiFont (11.0f, true));
+    g.drawText ("by fabenger", textBlock.withTrimmedTop (4.0f).translated (24.0f, 0.0f), juce::Justification::topLeft);
+
+    // captions above global controls
+    g.setFont (uiFont (10.0f, true));
+    g.setColour (C::inkDim);
     auto lab = [&] (juce::Component& c, const char* t) {
-        g.drawText (t, c.getBounds().translated (0, -13).withHeight (12), juce::Justification::centredLeft);
+        g.drawText (t, c.getBounds().translated (0, -14).withHeight (12), juce::Justification::centredLeft);
     };
     lab (keyBox, "KEY"); lab (scaleBox, "SCALE"); lab (barsBox, "LOOP"); lab (modeBox, "PLAY");
 
     drawPanel (g, sampleArea, "");
-    drawPanel (g, gridArea, "PATTERN  " + juce::String::charToString ((juce::juce_wchar) ('A' + selectedSlot))
-                               + "   click = on/off   drag = paint   wheel = velocity   right-click = note / ratchet");
-    drawPanel (g, genArea, "GENERATOR");
+    drawPanel (g, gridArea, "PATTERN " + juce::String::charToString ((juce::juce_wchar) ('A' + selectedSlot)));
+    {
+        g.setColour (C::inkDim);
+        g.setFont (uiFont (10.5f));
+        g.drawText ("click on/off   |   drag paint   |   wheel velocity   |   right-click note / ratchet",
+                    gridArea.reduced (16, 6).removeFromTop (14), juce::Justification::centredRight);
+    }
+    drawPanel (g, genArea, "RHYTHM GENERATOR");
     drawPanel (g, soundArea, "SOUND " + juce::String::charToString ((juce::juce_wchar) ('A' + selectedSlot)));
 
-    // sub-section captions in the sound panel
-    g.setColour (C::creamDim.withAlpha (0.6f));
-    g.setFont (monoFont (9.0f, true));
-    auto cap = [&] (Knob& first, Knob& last, const char* t) {
+    g.setColour (C::inkDim);
+    g.setFont (uiFont (9.5f, true));
+    auto cap = [&] (juce::Component& first, juce::Component& last, const char* t) {
         auto r = first.getBounds().getUnion (last.getBounds());
-        g.drawHorizontalLine (r.getY() - 4, (float) r.getX() + 4.0f, (float) r.getRight() - 4.0f);
-        g.drawText (t, r.getX(), r.getY() - 16, r.getWidth(), 11, juce::Justification::centred);
+        g.drawHorizontalLine (r.getY() - 5, (float) r.getX() + 4.0f, (float) r.getRight() - 4.0f);
+        g.drawText (t, r.getX(), r.getY() - 18, r.getWidth(), 11, juce::Justification::centred);
     };
     cap (pitch, start, "PITCH");
     cap (attack, gate, "ENVELOPE");
     cap (cutoff, crush, "COLOUR");
-    cap (vol, pan, "OUT");
+    cap (vol, outBox, "OUTPUT");
 }
 
 void FGenEditor::resized()
@@ -628,7 +665,7 @@ void FGenEditor::resized()
     }
     r.removeFromTop (10);
 
-    soundArea = r.removeFromBottom (112);
+    soundArea = r.removeFromBottom (120);
     r.removeFromBottom (10);
     genArea = r.removeFromBottom (92);
     r.removeFromBottom (10);
@@ -650,8 +687,8 @@ void FGenEditor::resized()
     }
 
     {
-        auto s = soundArea.reduced (12, 8).withTrimmedTop (24);
-        const int kw = 52;
+        auto s = soundArea.reduced (12, 8).withTrimmedTop (32);
+        const int kw = 50;
         auto place = [&] (Knob& k) { k.setBounds (s.removeFromLeft (kw)); };
         place (pitch); place (fine); place (start);
         s.removeFromLeft (10);
@@ -662,5 +699,7 @@ void FGenEditor::resized()
         place (drive); place (crush);
         s.removeFromLeft (10);
         place (vol); place (pan);
+        s.removeFromLeft (6);
+        outBox.setBounds (s.removeFromLeft (84).withSizeKeepingCentre (84, 26).translated (0, -6));
     }
 }
