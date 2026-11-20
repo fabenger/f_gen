@@ -1,0 +1,51 @@
+name: Build Windows installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache JUCE download
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: juce-8.0.4-${{ runner.os }}
+
+      - name: Configure
+        run: cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3 + Standalone
+        run: cmake --build build --config Release --target f_gen_VST3 f_gen_Standalone --parallel
+
+      - name: Install Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build installer
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.${{ github.run_number }} installer\f_gen.iss'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: f_gen-installer
+          path: installer/Output/*.exe
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: f_gen 1.0.${{ github.run_number }}
+          files: installer/Output/*.exe
+          make_latest: true
+          body: |
+            Download `f_gen_Setup_1.0.${{ github.run_number }}.exe`, run it, then rescan plugins in FL Studio
+            (Options > Manage plugins > Find installed plugins). f_gen shows up under Generators.
